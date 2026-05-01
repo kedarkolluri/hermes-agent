@@ -1,0 +1,7 @@
+name: govclaw
+version: 0.1.0
+description: "Stakeholder governance runtime — intercepts mutating tool calls, evaluates them against a policy bundle plus an LLM reviewer, and decides allow/deny/require_approval. Append-only audit log + multi-party approval state machine. No-RL v1."
+author: "@kedarkolluri (Hermes), GovClaw runtime"
+hooks:
+  - pre_tool_call
+  - post_tool_call

@@ -1,0 +1,99 @@
+policy_id: default_v1
+description: |
+  Generic v1 governance bundle. Covers the mutating tools Hermes ships with;
+  domain-specific bundles (e.g. bookkeeping_v1) override or extend this.
+
+stakeholder_priority:
+  - law_and_regulation
+  - user_explicit_authorization
+  - data_integrity
+  - convenience
+
+# Hardline denials — instant deny, never reach the reviewer LLM.
+# Mirrors the philosophy of tools/approval.py's hardline blocklist:
+# below the floor of "yolo trusts the agent with files/services" but
+# never with destruction of the host or audit chain.
+hardline_deny:
+  - id: catastrophic_shell
+    when:
+      tool: terminal
+      command_matches:
+        - 'rm\s+-rf\s+/(?:\s|$)'
+        - 'rm\s+-rf\s+/\*'
+        - ':\(\)\{\s*:\|\:&\s*\};\:'   # fork bomb
+        - '\bmkfs(?:\.[a-z0-9]+)?\b'
+        - '\bdd\b.*\bof=/dev/sd'
+        - 'shutdown\s+-h'
+        - 'halt\s*$'
+    message: "Catastrophic system command refused by GovClaw."
+
+  - id: tamper_audit_log
+    when:
+      tool: terminal
+      command_matches:
+        - '\.hermes/govclaw/audit\.jsonl'
+    message: "Refused: GovClaw audit log is append-only and tamper-evident."
+
+# Auto-allow shortcuts. Idempotent tools (read_file, search, etc.) are
+# already filtered out before we get here; this list is for explicit
+# whitelisting of mutating tools considered trivially safe for v1.
+auto_allow:
+  tools:
+    - todo          # Hermes's internal todo tracker; no external effect.
+    - memory        # Local memory store; reviewable post-hoc via audit.
+
+# Approval rules — pattern matched in order; first hit wins.
+approval_rules:
+  - id: send_external_message
+    when:
+      tool: send_message
+    required: [user]
+    risk_level: high
+    explanation: "Outbound message to a third party requires explicit approval."
+
+  - id: schedule_cronjob
+    when:
+      tool: cronjob
+    required: [user]
+    risk_level: high
+    explanation: "Scheduling background work requires explicit approval."
+
+  - id: outbound_http_mutation
+    when:
+      tool: terminal
+      command_matches:
+        - 'curl\b[^|]*\s+-X\s+(?:POST|PUT|PATCH|DELETE)\b'
+        - 'wget\b[^|]*--post-data'
+        - 'http(?:ie)?\s+(?:POST|PUT|PATCH|DELETE)\b'
+    required: [user]
+    risk_level: high
+    explanation: "Outbound HTTP write to external service requires approval."
+
+  - id: package_install
+    when:
+      tool: terminal
+      command_matches:
+        - '\b(?:apt-get|apt|yum|dnf|brew|pacman)\s+(?:install|add|remove)\b'
+        - '\bnpm\s+install\s+-g\b'
+        - '\bpip\s+install\b'
+    required: [user]
+    risk_level: medium
+    explanation: "System/package install requires approval."
+
+  - id: git_destructive
+    when:
+      tool: terminal
+      command_matches:
+        - '\bgit\s+push\s+(?:--force|-f)\b'
+        - '\bgit\s+reset\s+--hard\b'
+        - '\bgit\s+branch\s+-D\b'
+    required: [user]
+    risk_level: high
+    explanation: "Destructive git operation requires approval."
+
+# Audit policy — what gets written to the append-only log.
+audit_rules:
+  all_state_changes: true
+  all_denials: true
+  all_approvals: true
+  all_reviews: true

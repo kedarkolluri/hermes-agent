@@ -9856,6 +9856,24 @@ Examples:
     claw_parser.set_defaults(func=cmd_claw)
 
     # =========================================================================
+    # govclaw command — stakeholder governance runtime CLI
+    # =========================================================================
+    govclaw_parser = subparsers.add_parser(
+        "govclaw",
+        help="Stakeholder governance runtime: approvals, audit, policy",
+        description=(
+            "GovClaw governs Hermes's mutating tool calls against a policy "
+            "bundle and an LLM reviewer. This subcommand manages pending "
+            "approvals, inspects the audit log, and shows the active policy."
+        ),
+    )
+    govclaw_subparsers = govclaw_parser.add_subparsers(dest="govclaw_command")
+    from govclaw.cli import attach_subparsers as _govclaw_attach, cmd_govclaw
+
+    _govclaw_attach(govclaw_subparsers)
+    govclaw_parser.set_defaults(func=cmd_govclaw)
+
+    # =========================================================================
     # version command
     # =========================================================================
     version_parser = subparsers.add_parser("version", help="Show version information")
